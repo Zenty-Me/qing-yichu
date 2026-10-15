@@ -7,7 +7,6 @@ import { EmptyState } from '../components/EmptyState'
 import { useBlobUrl } from '../hooks/useBlobUrl'
 import { randomOutfit } from '../utils/randomOutfit'
 import { loadSettings } from '../utils/settings'
-import { canUse, consumeQuota } from '../utils/quota'
 import { Toast } from '../components/Toast'
 import { useI18n } from '../i18n/I18nProvider'
 
@@ -55,7 +54,6 @@ export function Outfits() {
   const [toast, setToast] = useState('')
   const [saving, setSaving] = useState(false)
   const [occasionFilter, setOccasionFilter] = useState<string | '全部'>('全部')
-  const [quotaLeft, setQuotaLeft] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,8 +61,6 @@ export function Outfits() {
     setOutfits(o)
     setAllItems(items)
     setLoading(false)
-    const { status } = await canUse('outfit')
-    setQuotaLeft(status.outfitUnlimited ? null : status.outfitLeft)
   }, [])
 
   useEffect(() => {
@@ -87,16 +83,6 @@ export function Outfits() {
   }, [outfits, occasionFilter])
 
   const rollRandom = async () => {
-    const gate = await canUse('outfit')
-    if (!gate.ok) {
-      setToast(
-        t('outfits.quotaExhausted', {
-          used: gate.status.outfitUsed,
-          limit: gate.status.outfitLimit,
-        }),
-      )
-      return
-    }
     const settings = loadSettings()
     const season = settings.seasonMode ? settings.currentSeasonFilter : null
     const picks = randomOutfit(allItems, season)
@@ -104,10 +90,7 @@ export function Outfits() {
     setShowRandom(true)
     if (picks.length === 0) {
       setToast(t('outfits.needMore'))
-      return
     }
-    const next = await consumeQuota('outfit')
-    setQuotaLeft(next.outfitUnlimited ? null : next.outfitLeft)
   }
 
   const saveRandom = async () => {
@@ -163,19 +146,6 @@ export function Outfits() {
           >
             {t('outfits.random')}
           </button>
-          {quotaLeft != null && (
-            <p className="insight-hint" style={{ marginBottom: 14 }}>
-              {t('outfits.quotaLeft', { n: quotaLeft })}
-              {quotaLeft === 0 && (
-                <>
-                  {' · '}
-                  <button type="button" className="btn-text" onClick={() => navigate('/upgrade')}>
-                    {t('cutout.upgradeCta')}
-                  </button>
-                </>
-              )}
-            </p>
-          )}
         </>
       )}
 
@@ -259,19 +229,7 @@ export function Outfits() {
       >
         +
       </button>
-      {toast && (
-        <Toast
-          message={toast}
-          onClose={() => setToast('')}
-        />
-      )}
-      {toast.includes('/') || toast.includes('limit') || toast.includes('用完') ? (
-        <div style={{ textAlign: 'center', marginTop: 8 }}>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/upgrade')}>
-            {t('profile.upgrade')}
-          </button>
-        </div>
-      ) : null}
+      {toast && <Toast message={toast} onClose={() => setToast('')} />}
     </div>
   )
 }

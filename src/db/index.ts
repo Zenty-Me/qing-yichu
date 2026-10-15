@@ -406,14 +406,3 @@ export async function importAllData(
   await Promise.all(ops)
 }
 
-// —— App meta / quotas ——
-export async function getQuotaRecord(): Promise<QuotaRecord | undefined> {
-  const db = await getDB()
-  if (!db.objectStoreNames.contains('appMeta')) return undefined
-  return db.get('appMeta', 'usageQuota')
-}
-
-export async function putQuotaRecord(rec: QuotaRecord): Promise<void> {
-  const db = await getDB()
-  await db.put('appMeta', rec)
-}
