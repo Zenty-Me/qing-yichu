@@ -18,6 +18,21 @@ interface Props {
   enableCutout?: boolean
 }
 
+type Rect = { x: number; y: number; w: number; h: number }
+type Handle = 'move' | 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se'
+
+const MIN = 0.08
+const DEFAULT_CROP: Rect = { x: 0.08, y: 0.08, w: 0.84, h: 0.84 }
+
+function clampRect(r: Rect): Rect {
+  let { x, y, w, h } = r
+  w = Math.max(MIN, Math.min(1, w))
+  h = Math.max(MIN, Math.min(1, h))
+  x = Math.max(0, Math.min(1 - w, x))
+  y = Math.max(0, Math.min(1 - h, y))
+  return { x, y, w, h }
+}
+
 export function ImageEditor({
   blob,
   onChange,
@@ -27,17 +42,21 @@ export function ImageEditor({
 }: Props) {
   const { t } = useI18n()
   const url = useBlobUrl(blob)
-  const imgRef = useRef<HTMLImageElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
   const [cropping, setCropping] = useState(false)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
-  const [drag, setDrag] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
-  const start = useRef<{ x: number; y: number } | null>(null)
+  const [rect, setRect] = useState<Rect>(DEFAULT_CROP)
+  const dragRef = useRef<{
+    handle: Handle
+    startX: number
+    startY: number
+    origin: Rect
+  } | null>(null)
 
   useEffect(() => {
     setError('')
   }, [blob])
-
 
   const rotate = async () => {
     setBusy(t('editor.rotating'))
@@ -50,54 +69,105 @@ export function ImageEditor({
     setBusy('')
   }
 
-  const pointInImage = (clientX: number, clientY: number) => {
-    const img = imgRef.current
-    if (!img) return null
-    const r = img.getBoundingClientRect()
-    const x = (clientX - r.left) / r.width
-    const y = (clientY - r.top) / r.height
-    if (x < 0 || y < 0 || x > 1 || y > 1) return null
-    return { x, y }
+  const pointInStage = (clientX: number, clientY: number) => {
+    const el = stageRef.current
+    if (!el) return null
+    const r = el.getBoundingClientRect()
+    if (r.width <= 0 || r.height <= 0) return null
+    return {
+      x: Math.max(0, Math.min(1, (clientX - r.left) / r.width)),
+      y: Math.max(0, Math.min(1, (clientY - r.top) / r.height)),
+    }
   }
 
-  const onPointerDown = (e: React.PointerEvent) => {
+  const beginCrop = () => {
+    setRect(DEFAULT_CROP)
+    setCropping(true)
+    setError('')
+  }
+
+  const onPointerDown = (e: React.PointerEvent, handle: Handle) => {
     if (!cropping) return
-    const p = pointInImage(e.clientX, e.clientY)
+    e.preventDefault()
+    e.stopPropagation()
+    const p = pointInStage(e.clientX, e.clientY)
     if (!p) return
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    start.current = p
-    setDrag({ x: p.x, y: p.y, w: 0, h: 0 })
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    dragRef.current = {
+      handle,
+      startX: p.x,
+      startY: p.y,
+      origin: { ...rect },
+    }
   }
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!cropping || !start.current) return
-    const p = pointInImage(e.clientX, e.clientY)
+    const d = dragRef.current
+    if (!cropping || !d) return
+    const p = pointInStage(e.clientX, e.clientY)
     if (!p) return
-    const x = Math.min(start.current.x, p.x)
-    const y = Math.min(start.current.y, p.y)
-    setDrag({
-      x,
-      y,
-      w: Math.abs(p.x - start.current.x),
-      h: Math.abs(p.y - start.current.y),
-    })
+    const dx = p.x - d.startX
+    const dy = p.y - d.startY
+    const o = d.origin
+    let next: Rect = { ...o }
+
+    switch (d.handle) {
+      case 'move':
+        next = { x: o.x + dx, y: o.y + dy, w: o.w, h: o.h }
+        break
+      case 'n':
+        next = { x: o.x, y: o.y + dy, w: o.w, h: o.h - dy }
+        break
+      case 's':
+        next = { x: o.x, y: o.y, w: o.w, h: o.h + dy }
+        break
+      case 'w':
+        next = { x: o.x + dx, y: o.y, w: o.w - dx, h: o.h }
+        break
+      case 'e':
+        next = { x: o.x, y: o.y, w: o.w + dx, h: o.h }
+        break
+      case 'nw':
+        next = { x: o.x + dx, y: o.y + dy, w: o.w - dx, h: o.h - dy }
+        break
+      case 'ne':
+        next = { x: o.x, y: o.y + dy, w: o.w + dx, h: o.h - dy }
+        break
+      case 'sw':
+        next = { x: o.x + dx, y: o.y, w: o.w - dx, h: o.h + dy }
+        break
+      case 'se':
+        next = { x: o.x, y: o.y, w: o.w + dx, h: o.h + dy }
+        break
+    }
+
+    // Normalize inverted drags
+    if (next.w < 0) {
+      next.x += next.w
+      next.w = Math.abs(next.w)
+    }
+    if (next.h < 0) {
+      next.y += next.h
+      next.h = Math.abs(next.h)
+    }
+    setRect(clampRect(next))
   }
 
   const onPointerUp = () => {
-    start.current = null
+    dragRef.current = null
   }
 
   const applyCrop = async () => {
-    if (!drag || drag.w < 0.05 || drag.h < 0.05) {
+    if (rect.w < MIN || rect.h < MIN) {
       setError(t('editor.cropHint'))
       return
     }
     setBusy(t('editor.cropping'))
     try {
-      const next = await cropImage(blob, drag)
+      if (onOriginalChange && !originalBlob) onOriginalChange(blob)
+      const next = await cropImage(blob, rect)
       onChange(next)
       setCropping(false)
-      setDrag(null)
     } catch {
       setError(t('editor.cropFail'))
     }
@@ -126,36 +196,62 @@ export function ImageEditor({
     onChange(originalBlob)
   }
 
+  const handles: Handle[] = ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w']
+
   return (
     <div className="image-editor">
       <div
+        ref={stageRef}
         className={`image-editor-stage${cropping ? ' cropping' : ''}`}
-        onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
       >
         {url && (
-          <img ref={imgRef} className="image-preview" src={url} alt={t('editor.preview')} draggable={false} />
+          <img className="image-preview" src={url} alt={t('editor.preview')} draggable={false} />
         )}
-        {cropping && drag && drag.w > 0 && (
-          <div
-            className="crop-box"
-            style={{
-              left: `${drag.x * 100}%`,
-              top: `${drag.y * 100}%`,
-              width: `${drag.w * 100}%`,
-              height: `${drag.h * 100}%`,
-            }}
-          />
+        {cropping && (
+          <>
+            <div className="crop-shade" aria-hidden>
+              <div
+                className="crop-shade-hole"
+                style={{
+                  left: `${rect.x * 100}%`,
+                  top: `${rect.y * 100}%`,
+                  width: `${rect.w * 100}%`,
+                  height: `${rect.h * 100}%`,
+                }}
+              />
+            </div>
+            <div
+              className="crop-box crop-box-interactive"
+              style={{
+                left: `${rect.x * 100}%`,
+                top: `${rect.y * 100}%`,
+                width: `${rect.w * 100}%`,
+                height: `${rect.h * 100}%`,
+              }}
+              onPointerDown={(e) => onPointerDown(e, 'move')}
+            >
+              <div className="crop-grid" aria-hidden />
+              {handles.map((h) => (
+                <span
+                  key={h}
+                  className={`crop-handle crop-handle-${h}`}
+                  onPointerDown={(e) => onPointerDown(e, h)}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
       <div className="image-editor-tools">
-        <button type="button" className="chip" disabled={!!busy} onClick={() => void rotate()}>
+        <button type="button" className="chip" disabled={!!busy || cropping} onClick={() => void rotate()}>
           {t('editor.rotate')}
         </button>
         {!cropping ? (
-          <button type="button" className="chip" disabled={!!busy} onClick={() => setCropping(true)}>
+          <button type="button" className="chip" disabled={!!busy} onClick={beginCrop}>
             {t('editor.crop')}
           </button>
         ) : (
@@ -168,7 +264,7 @@ export function ImageEditor({
               className="chip"
               onClick={() => {
                 setCropping(false)
-                setDrag(null)
+                setError('')
               }}
             >
               {t('editor.cancel')}
@@ -176,16 +272,19 @@ export function ImageEditor({
           </>
         )}
         {enableCutout && (
-          <button type="button" className="chip" disabled={!!busy} onClick={() => void cutout()}>
+          <button type="button" className="chip" disabled={!!busy || cropping} onClick={() => void cutout()}>
             {t('cutout.btn')}
           </button>
         )}
         {originalBlob && (
-          <button type="button" className="chip" disabled={!!busy} onClick={restore}>
+          <button type="button" className="chip" disabled={!!busy || cropping} onClick={restore}>
             {t('editor.restore')}
           </button>
         )}
       </div>
+      {cropping && !busy && !error && (
+        <p className="editor-status">{t('editor.cropDragHint')}</p>
+      )}
       {busy && <p className="editor-status">{busy}</p>}
       {error && <p className="editor-status error">{error}</p>}
     </div>

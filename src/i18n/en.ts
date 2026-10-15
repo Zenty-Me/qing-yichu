@@ -116,7 +116,8 @@ export const en: Dict = {
   'editor.preview': 'Preview',
   'editor.rotating': 'Rotating…',
   'editor.rotateFail': 'Rotate failed',
-  'editor.cropHint': 'Drag to select an area',
+  'editor.cropHint': 'Adjust the crop box',
+  'editor.cropDragHint': 'Drag corners to resize, drag inside to move (free aspect)',
   'editor.cropping': 'Cropping…',
   'editor.cropFail': 'Crop failed',
 

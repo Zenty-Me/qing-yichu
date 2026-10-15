@@ -116,7 +116,8 @@ export const zh: Dict = {
   'editor.preview': '预览',
   'editor.rotating': '旋转中…',
   'editor.rotateFail': '旋转失败',
-  'editor.cropHint': '请拖选一块区域',
+  'editor.cropHint': '请调整裁剪框',
+  'editor.cropDragHint': '拖动边角调整，拖动框内移动（自由比例）',
   'editor.cropping': '裁剪中…',
   'editor.cropFail': '裁剪失败',
 
