@@ -1,6 +1,6 @@
 {
-  "version": "0.3.0",
-  "build": 5,
+  "version": "0.3.1",
+  "build": 6,
   "apkUrl": "https://github.com/Zenty-Me/qing-yichu/releases/download/android-debug-latest/qing-yichu-debug.apk",
-  "notes": "Overseas pilot foundation: zh/en i18n, free monthly quotas, Pro flag + export gate, Stripe checkout stubs"
+  "notes": "Domestic free restore: unlimited cutout/outfit, free backup export/import. Overseas freemium lives in Closet Lite."
 }

@@ -2,7 +2,7 @@ import type { Dict } from './types'
 
 /** US English — PWA pilot copy (product may refine later) */
 export const en: Dict = {
-  'app.name': 'Light Closet',
+  'app.name': '轻衣橱',
   'nav.wardrobe': 'Closet',
   'nav.outfits': 'Outfits',
   'nav.inspire': 'Inspire',
@@ -60,11 +60,11 @@ export const en: Dict = {
   'profile.langZh': '中文',
   'profile.langEn': 'English',
   'profile.export': 'Export backup',
-  'profile.exportMeta': 'JSON (Pro)',
+  'profile.exportMeta': 'JSON',
   'profile.exportCsv': 'Export items CSV',
   'profile.exportCsvMeta': 'Spreadsheet',
   'profile.import': 'Import backup',
-  'profile.importMeta': 'v1–v7 (Pro)',
+  'profile.importMeta': 'v1–v7',
   'profile.exportDone': 'Backup exported',
   'profile.exportFail': 'Export failed',
   'profile.importDone': 'Import complete',

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { cropImage, rotateImage } from '../utils/image'
 import { useBlobUrl } from '../hooks/useBlobUrl'
 import {
@@ -8,7 +7,6 @@ import {
   removeImageBackground,
   yieldToUi,
 } from '../utils/cutout'
-import { canUse, consumeQuota } from '../utils/quota'
 import { useI18n } from '../i18n/I18nProvider'
 
 interface Props {
@@ -28,13 +26,11 @@ export function ImageEditor({
   enableCutout = true,
 }: Props) {
   const { t } = useI18n()
-  const navigate = useNavigate()
   const url = useBlobUrl(blob)
   const imgRef = useRef<HTMLImageElement>(null)
   const [cropping, setCropping] = useState(false)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
-  const [quotaHint, setQuotaHint] = useState('')
   const [drag, setDrag] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const start = useRef<{ x: number; y: number } | null>(null)
 
@@ -42,15 +38,6 @@ export function ImageEditor({
     setError('')
   }, [blob])
 
-  useEffect(() => {
-    void canUse('cutout').then(({ status }) => {
-      if (status.cutoutUnlimited) {
-        setQuotaHint('')
-        return
-      }
-      setQuotaHint(t('cutout.quotaLeft', { n: status.cutoutLeft }))
-    })
-  }, [t, blob])
 
   const rotate = async () => {
     setBusy(t('editor.rotating'))
@@ -118,18 +105,6 @@ export function ImageEditor({
   }
 
   const cutout = async () => {
-    const gate = await canUse('cutout')
-    if (!gate.ok) {
-      setError(
-        t('cutout.quotaExhausted', {
-          used: gate.status.cutoutUsed,
-          limit: gate.status.cutoutLimit,
-        }),
-      )
-      setQuotaHint(t('cutout.upgradeCta'))
-      return
-    }
-
     setBusy(cutoutBusyMessage(0))
     setError('')
     await yieldToUi()
@@ -139,10 +114,6 @@ export function ImageEditor({
         onProgress: (p) => setBusy(cutoutBusyMessage(p.percent)),
       })
       onChange(raw)
-      const next = await consumeQuota('cutout')
-      if (!next.cutoutUnlimited) {
-        setQuotaHint(t('cutout.quotaLeft', { n: next.cutoutLeft }))
-      }
     } catch (err) {
       console.error(err)
       setError(cutoutErrorMessage(err))
@@ -216,20 +187,7 @@ export function ImageEditor({
         )}
       </div>
       {busy && <p className="editor-status">{busy}</p>}
-      {error && (
-        <p className="editor-status error">
-          {error}
-          {error.includes('/') || error.toLowerCase().includes('limit') || error.includes('用完') ? (
-            <>
-              {' '}
-              <button type="button" className="btn-text" onClick={() => navigate('/upgrade')}>
-                {t('cutout.upgradeCta')}
-              </button>
-            </>
-          ) : null}
-        </p>
-      )}
-      {!error && quotaHint && enableCutout && <p className="editor-status muted">{quotaHint}</p>}
+      {error && <p className="editor-status error">{error}</p>}
     </div>
   )
 }

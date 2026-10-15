@@ -46,7 +46,6 @@ import {
   type RemoteAppVersion,
 } from '../utils/appUpdate'
 import { useI18n } from '../i18n/I18nProvider'
-import { getQuotaStatus, type QuotaStatus } from '../utils/quota'
 import {
   formatYuan,
   summarizeWardrobeValue,
@@ -58,7 +57,6 @@ export function Profile() {
   const navigate = useNavigate()
   const { t, lang, setLang } = useI18n()
   const [itemCount, setItemCount] = useState(0)
-  const [quota, setQuota] = useState<QuotaStatus | null>(null)
   const [outfitCount, setOutfitCount] = useState(0)
   const [logCount, setLogCount] = useState(0)
   const [inspCount, setInspCount] = useState(0)
@@ -119,7 +117,6 @@ export function Profile() {
       summarizeWardrobeValue(items, { includeRetired: loadSettings().includeRetiredInValue }),
     )
     setWishEstimate(summarizeWishlistValue(wishlist))
-    setQuota(await getQuotaStatus())
   }, [])
 
   useEffect(() => {
@@ -127,7 +124,7 @@ export function Profile() {
   }, [refresh])
 
   const updateSettings = (patch: Partial<AppSettings>) => {
-    // Merge from disk so language/isPro toggled elsewhere are not overwritten
+    // Merge from disk so language toggled elsewhere is not overwritten
     const next = { ...loadSettings(), ...settings, ...patch, language: lang }
     setSettings(next)
     saveSettings(next)
@@ -138,10 +135,6 @@ export function Profile() {
   }
 
   const exportBackup = async () => {
-    if (!loadSettings().isPro) {
-      setToast(t('profile.exportProOnly'))
-      return
-    }
     setBusy(true)
     try {
       const [items, outfits, wearLogs, inspirations, wishlist] = await Promise.all([
@@ -222,10 +215,6 @@ export function Profile() {
   }
 
   const importBackup = async (file: File) => {
-    if (!loadSettings().isPro) {
-      setToast(t('profile.importProOnly'))
-      return
-    }
     setBusy(true)
     try {
       const data = JSON.parse(await file.text()) as BackupData
@@ -363,8 +352,6 @@ export function Profile() {
     setToast(t('profile.cleared'))
   }
 
-  const planIsPro = settings.isPro || Boolean(quota?.isPro)
-
   return (
     <div>
       <h1 className="page-title">{t('profile.title')}</h1>
@@ -388,51 +375,6 @@ export function Profile() {
           <div className="stat-label">{t('profile.stat.inspire')}</div>
         </div>
       </div>
-
-      <section className="insight-section plan-card">
-        <div className="plan-status-row">
-          <h3 className="insight-title" style={{ marginBottom: 0 }}>{t('profile.plan')}</h3>
-          <span className={`plan-badge${planIsPro ? ' pro' : ''}`}>
-            {planIsPro ? t('profile.planPro') : t('profile.planFree')}
-          </span>
-        </div>
-        {quota && (
-          <div style={{ marginTop: 10 }}>
-            <p className="insight-hint" style={{ marginBottom: 4 }}>
-              {planIsPro
-                ? t('profile.unlimited')
-                : t('profile.cutoutLeft', { n: quota.cutoutLeft, limit: quota.cutoutLimit })}
-            </p>
-            <p className="insight-hint" style={{ marginBottom: 8 }}>
-              {planIsPro
-                ? t('profile.unlimited')
-                : t('profile.outfitLeft', { n: quota.outfitLeft, limit: quota.outfitLimit })}
-            </p>
-          </div>
-        )}
-        <p className="insight-hint">
-          {t('profile.syncSoon')}
-          <span className="coming-soon-badge">Coming soon</span>
-        </p>
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ flex: 1 }}
-            onClick={() => navigate('/upgrade')}
-          >
-            {planIsPro ? t('profile.manage') : t('profile.upgrade')}
-          </button>
-        </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-block"
-          style={{ marginTop: 8 }}
-          onClick={() => navigate('/upgrade')}
-        >
-          {t('profile.creditPack')}
-        </button>
-      </section>
 
       <section className="insight-section">
         <h3 className="insight-title">{t('profile.language')}</h3>
@@ -571,14 +513,7 @@ export function Profile() {
           <span>回收站</span>
           <span>恢复 / 彻底删除</span>
         </button>
-        <button type="button" className="menu-item" disabled={busy} onClick={() => {
-          if (!loadSettings().isPro) {
-            setToast(t('profile.exportProOnly'))
-            navigate('/upgrade')
-            return
-          }
-          void exportBackup()
-        }}>
+        <button type="button" className="menu-item" disabled={busy} onClick={() => void exportBackup()}>
           <span>{t('profile.export')}</span>
           <span>{t('profile.exportMeta')}</span>
         </button>
@@ -586,14 +521,7 @@ export function Profile() {
           <span>{t('profile.exportCsv')}</span>
           <span>{t('profile.exportCsvMeta')}</span>
         </button>
-        <button type="button" className="menu-item" disabled={busy} onClick={() => {
-          if (!loadSettings().isPro) {
-            setToast(t('profile.importProOnly'))
-            navigate('/upgrade')
-            return
-          }
-          fileRef.current?.click()
-        }}>
+        <button type="button" className="menu-item" disabled={busy} onClick={() => fileRef.current?.click()}>
           <span>{t('profile.import')}</span>
           <span>{t('profile.importMeta')}</span>
         </button>

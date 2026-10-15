@@ -14,7 +14,6 @@ import { RecycleBin } from './pages/RecycleBin'
 import { CategoryManage } from './pages/CategoryManage'
 import { Wishlist } from './pages/Wishlist'
 import { Laundry } from './pages/Laundry'
-import { Upgrade } from './pages/Upgrade'
 
 export default function App() {
   return (
@@ -37,7 +36,6 @@ export default function App() {
           <Route path="categories" element={<CategoryManage />} />
           <Route path="wishlist" element={<Wishlist />} />
           <Route path="laundry" element={<Laundry />} />
-          <Route path="upgrade" element={<Upgrade />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
