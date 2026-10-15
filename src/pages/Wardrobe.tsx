@@ -33,25 +33,28 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 ]
 
 const BATCH_CAP = 30
-const VIEW_KEY = 'qing-yichu-wardrobe-view'
 
-type ViewMode = 'grouped' | 'grid'
-
-function loadView(): ViewMode {
-  try {
-    const v = localStorage.getItem(VIEW_KEY)
-    return v === 'grid' ? 'grid' : 'grouped'
-  } catch {
-    return 'grouped'
-  }
-}
-
-function GroupThumb({ item, onClick }: { item: ClothingItem; onClick: () => void }) {
+function RailCard({
+  item,
+  wearCount,
+  onClick,
+}: {
+  item: ClothingItem
+  wearCount?: number
+  onClick: () => void
+}) {
   const url = useBlobUrl(item.imageBlob, item.updatedAt)
   return (
-    <button type="button" className="group-thumb" onClick={onClick}>
-      {url ? <img src={url} alt={item.name || item.category} /> : <div className="group-thumb-ph" />}
-      {item.subcategory ? <span className="group-thumb-badge">{item.subcategory}</span> : null}
+    <button type="button" className="rail-card" onClick={onClick}>
+      <div className="rail-card-img-wrap">
+        {url ? <img src={url} alt={item.name || item.category} /> : <div className="rail-card-ph" />}
+        {typeof wearCount === 'number' && wearCount > 0 && (
+          <span className="wear-pill">穿 {wearCount}</span>
+        )}
+        {item.needsWash && <span className="laundry-pill">待洗</span>}
+        {item.subcategory ? <span className="group-thumb-badge">{item.subcategory}</span> : null}
+      </div>
+      <div className="rail-card-name">{item.name || CATEGORY_LABEL[item.category] || item.category}</div>
     </button>
   )
 }
@@ -65,13 +68,11 @@ export function Wardrobe() {
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
-  const [category, setCategory] = useState<Category | '全部'>('全部')
   const [color, setColor] = useState<string | '全部'>('全部')
   const [season, setSeason] = useState<Season | '全部'>('全部')
   const [sort, setSort] = useState<SortKey>('created')
   const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [settings, setSettings] = useState(() => loadSettings())
-  const [view, setView] = useState<ViewMode>(() => loadView())
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState('')
   const [batchBusy, setBatchBusy] = useState(false)
@@ -82,6 +83,8 @@ export function Wardrobe() {
   const [laundryOnly, setLaundryOnly] = useState(false)
   /** per-category subcategory filter; '' = 全部 */
   const [subFilter, setSubFilter] = useState<Partial<Record<Category, string>>>({})
+  /** optional one-shot focus from ?category= deep link */
+  const [focusCategory, setFocusCategory] = useState<Category | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -123,8 +126,7 @@ export function Wardrobe() {
   useEffect(() => {
     const cat = searchParams.get('category')
     if (cat && (CATEGORIES as readonly string[]).includes(cat)) {
-      setCategory(cat as Category)
-      setViewMode('grid')
+      setFocusCategory(cat as Category)
       const next = new URLSearchParams(searchParams)
       next.delete('category')
       setSearchParams(next, { replace: true })
@@ -132,16 +134,11 @@ export function Wardrobe() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  const setViewMode = (m: ViewMode) => {
-    setView(m)
-    localStorage.setItem(VIEW_KEY, m)
-  }
-
   const filtered = useMemo(
     () =>
       filterAndSortItems(items, {
         search,
-        category,
+        category: focusCategory ?? '全部',
         color,
         season,
         sort,
@@ -150,7 +147,7 @@ export function Wardrobe() {
         wearCounts: wearMap,
         laundryOnly,
       }),
-    [items, search, category, color, season, sort, settings, wearMap, laundryOnly],
+    [items, search, focusCategory, color, season, sort, settings, wearMap, laundryOnly],
   )
 
   const valueSummary = useMemo(
@@ -160,20 +157,22 @@ export function Wardrobe() {
 
   const seasonBanner = useMemo(() => seasonReminderMessage(settings), [settings])
 
-    const sections = useMemo(() => {
+  /** Non-empty category sections only (empty sections hidden). */
+  const sections = useMemo(() => {
     const byCat = new Map<Category, ClothingItem[]>()
     for (const c of CATEGORIES) byCat.set(c, [])
     for (const it of filtered) {
       byCat.get(it.category)?.push(it)
     }
     const result: { cat: Category; list: ClothingItem[] }[] = []
-    for (const c of CORE_CATEGORIES) {
-      result.push({ cat: c, list: byCat.get(c) ?? [] })
-    }
-    for (const c of CATEGORIES) {
-      if (CORE_CATEGORIES.includes(c)) continue
+    const pushIfNonEmpty = (c: Category) => {
       const list = byCat.get(c) ?? []
       if (list.length > 0) result.push({ cat: c, list })
+    }
+    for (const c of CORE_CATEGORIES) pushIfNonEmpty(c)
+    for (const c of CATEGORIES) {
+      if (CORE_CATEGORIES.includes(c)) continue
+      pushIfNonEmpty(c)
     }
     return result
   }, [filtered])
@@ -286,14 +285,9 @@ export function Wardrobe() {
   return (
     <div className={`page-with-fab${selectMode ? ' page-selecting' : ''}`}>
       <header className="wardrobe-topbar">
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label="切换视图"
-          onClick={() => setViewMode(view === 'grouped' ? 'grid' : 'grouped')}
-        >
-          {view === 'grouped' ? '▦' : '☰'}
-        </button>
+        <span className="icon-btn" aria-hidden style={{ visibility: 'hidden' }}>
+          ▦
+        </span>
         <h1 className="wardrobe-title">{t('wardrobe.title')}</h1>
         <div className="wardrobe-topbar-right">
           <button
@@ -337,7 +331,11 @@ export function Wardrobe() {
             type="button"
             onClick={() => {
               setShowMoreMenu(false)
-              selectMode ? exitSelect() : (setSelectMode(true), setSelected(new Set()))
+              if (selectMode) exitSelect()
+              else {
+                setSelectMode(true)
+                setSelected(new Set())
+              }
             }}
           >
             {selectMode ? '退出选择' : '选择'}
@@ -405,6 +403,15 @@ export function Wardrobe() {
         </div>
       )}
 
+      {focusCategory && (
+        <div className="filter-banner">
+          仅看「{CATEGORY_LABEL[focusCategory]}」
+          <button type="button" className="btn-text" onClick={() => setFocusCategory(null)}>
+            显示全部分类
+          </button>
+        </div>
+      )}
+
       {showSearch && (
         <input
           className="form-input search-input"
@@ -416,9 +423,7 @@ export function Wardrobe() {
         />
       )}
 
-      {!loading && !selectMode && view === 'grid' && items.length >= 2 && (
-        <TodaySuggest items={items} />
-      )}
+      {!loading && !selectMode && items.length >= 2 && <TodaySuggest items={items} />}
 
       {selectMode && (
         <div className="toolbar-row">
@@ -434,18 +439,8 @@ export function Wardrobe() {
         </div>
       )}
 
-      {view === 'grid' && items.length > 0 && !selectMode && (
+      {items.length > 0 && !selectMode && (
         <>
-          <div className="filter-row">
-            <button type="button" className={`chip${category === '全部' ? ' active' : ''}`} onClick={() => setCategory('全部')}>
-              全部
-            </button>
-            {CATEGORIES.map((c) => (
-              <button key={c} type="button" className={`chip${category === c ? ' active' : ''}`} onClick={() => setCategory(c)}>
-                {CATEGORY_LABEL[c]}
-              </button>
-            ))}
-          </div>
           <div className="toolbar-row">
             <select className="form-select sort-select" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
               {SORT_OPTIONS.map((o) => (
@@ -495,23 +490,34 @@ export function Wardrobe() {
           actionLabel="添加单品"
           onAction={() => navigate('/items/new')}
         />
-      ) : view === 'grouped' && !selectMode ? (
+      ) : selectMode ? (
+        filtered.length === 0 ? (
+          <EmptyState icon="👗" title="没有符合条件的单品" description="试试调整筛选" />
+        ) : (
+          <div className="item-grid">
+            {filtered.map((item) => (
+              <ItemCard
+                key={`${item.id}-${item.updatedAt}`}
+                item={item}
+                wearCount={wearMap.get(item.id)}
+                selectMode
+                selected={selected.has(item.id)}
+                onClick={() => toggleSelect(item.id)}
+              />
+            ))}
+          </div>
+        )
+      ) : sections.length === 0 ? (
+        <EmptyState icon="👗" title="没有符合条件的单品" description="试试调整筛选" />
+      ) : (
         <div className="category-sections">
           {sections.map(({ cat, list }) => (
-            <section key={cat} className="category-card">
+            <section key={cat} className="category-card" id={`cat-${cat}`}>
               <div className="category-card-head">
-                <button
-                  type="button"
-                  className="category-card-title"
-                  onClick={() => {
-                    setViewMode('grid')
-                    setCategory(cat)
-                  }}
-                >
+                <div className="category-card-title">
                   {CATEGORY_LABEL[cat]}
                   <span className="category-count">({list.length})</span>
-                  <span className="attr-chevron">›</span>
-                </button>
+                </div>
                 <div className="category-card-actions">
                   <button
                     type="button"
@@ -536,7 +542,7 @@ export function Wardrobe() {
                 const hasAnySub = list.some((i) => Boolean(i.subcategory))
                 return (
                   <>
-                    {hasAnySub && list.length > 0 && (
+                    {hasAnySub && (
                       <div className="subcat-filter-row">
                         <button
                           type="button"
@@ -567,19 +573,16 @@ export function Wardrobe() {
                       </div>
                     )}
                     <div className="category-rail">
-                      {list.length === 0 ? (
-                        <button
-                          type="button"
-                          className="group-thumb group-thumb-empty"
-                          onClick={() => navigate(`/items/new?category=${encodeURIComponent(cat)}`)}
-                        >
-                          +
-                        </button>
-                      ) : shown.length === 0 ? (
+                      {shown.length === 0 ? (
                         <p className="subcat-empty-hint">该子分类下暂无单品</p>
                       ) : (
                         shown.map((it) => (
-                          <GroupThumb key={`${it.id}-${it.updatedAt}`} item={it} onClick={() => navigate(`/items/${it.id}`)} />
+                          <RailCard
+                            key={`${it.id}-${it.updatedAt}`}
+                            item={it}
+                            wearCount={wearMap.get(it.id)}
+                            onClick={() => navigate(`/items/${it.id}`)}
+                          />
                         ))
                       )}
                     </div>
@@ -587,23 +590,6 @@ export function Wardrobe() {
                 )
               })()}
             </section>
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <EmptyState icon="👗" title="没有符合条件的单品" description="试试调整筛选" />
-      ) : (
-        <div className="item-grid">
-          {filtered.map((item) => (
-            <ItemCard
-              key={`${item.id}-${item.updatedAt}`}
-              item={item}
-              wearCount={wearMap.get(item.id)}
-              selectMode={selectMode}
-              selected={selected.has(item.id)}
-              onClick={() =>
-                selectMode ? toggleSelect(item.id) : navigate(`/items/${item.id}`)
-              }
-            />
           ))}
         </div>
       )}

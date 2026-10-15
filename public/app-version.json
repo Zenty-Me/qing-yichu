@@ -1,6 +1,6 @@
 {
-  "version": "0.3.1",
-  "build": 6,
+  "version": "0.3.2",
+  "build": 7,
   "apkUrl": "https://github.com/Zenty-Me/qing-yichu/releases/download/android-debug-latest/qing-yichu-debug.apk",
-  "notes": "Domestic free restore: unlimited cutout/outfit, free backup export/import. Overseas freemium lives in Closet Lite."
+  "notes": "衣橱首页：去掉顶部分类 Tab，改为分类分节 + 横向滑动；空分类隐藏；裁剪框可拖动边角自由比例调整。"
 }

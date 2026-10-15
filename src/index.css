@@ -1162,6 +1162,9 @@ img {
   position: relative;
   touch-action: none;
   user-select: none;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--paper);
 }
 
 .image-editor-stage.cropping {
@@ -1171,15 +1174,112 @@ img {
 .image-editor-stage .image-preview {
   margin-bottom: 0;
   pointer-events: none;
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  aspect-ratio: auto;
+  object-fit: contain;
+  display: block;
+  background: var(--paper);
 }
 
 .crop-box {
   position: absolute;
   border: 2px solid var(--accent);
-  background: rgba(52, 120, 246, 0.18);
+  background: transparent;
   box-sizing: border-box;
   pointer-events: none;
 }
+.crop-box-interactive {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: move;
+  z-index: 2;
+}
+.crop-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  /* dim whole stage; hole punched via box-shadow on child */
+}
+.crop-shade-hole {
+  position: absolute;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.48);
+  border-radius: 2px;
+}
+.crop-grid {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, transparent 33.33%, rgba(255,255,255,0.35) 33.33%, rgba(255,255,255,0.35) 33.7%, transparent 33.7%, transparent 66.66%, rgba(255,255,255,0.35) 66.66%, rgba(255,255,255,0.35) 67.03%, transparent 67.03%),
+    linear-gradient(to bottom, transparent 33.33%, rgba(255,255,255,0.35) 33.33%, rgba(255,255,255,0.35) 33.7%, transparent 33.7%, transparent 66.66%, rgba(255,255,255,0.35) 66.66%, rgba(255,255,255,0.35) 67.03%, transparent 67.03%);
+  pointer-events: none;
+}
+.crop-handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border: 2px solid var(--accent);
+  border-radius: 3px;
+  box-sizing: border-box;
+  z-index: 3;
+  touch-action: none;
+}
+.crop-handle-nw { left: -9px; top: -9px; cursor: nwse-resize; }
+.crop-handle-ne { right: -9px; top: -9px; cursor: nesw-resize; }
+.crop-handle-sw { left: -9px; bottom: -9px; cursor: nesw-resize; }
+.crop-handle-se { right: -9px; bottom: -9px; cursor: nwse-resize; }
+.crop-handle-n { left: 50%; top: -9px; transform: translateX(-50%); cursor: ns-resize; width: 22px; height: 14px; }
+.crop-handle-s { left: 50%; bottom: -9px; transform: translateX(-50%); cursor: ns-resize; width: 22px; height: 14px; }
+.crop-handle-e { right: -9px; top: 50%; transform: translateY(-50%); cursor: ew-resize; width: 14px; height: 22px; }
+.crop-handle-w { left: -9px; top: 50%; transform: translateY(-50%); cursor: ew-resize; width: 14px; height: 22px; }
+
+/* Horizontal category rails — swipe cards */
+.rail-card {
+  flex: 0 0 auto;
+  width: 132px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+.rail-card:active {
+  opacity: 0.92;
+}
+.rail-card-img-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: var(--paper);
+}
+.rail-card-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.rail-card-ph {
+  width: 100%;
+  height: 100%;
+  background: var(--paper);
+}
+.rail-card-name {
+  padding: 6px 8px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 
 .image-editor-tools {
   display: flex;
@@ -1426,7 +1526,6 @@ img {
   font-weight: 600;
   color: var(--ink);
   padding: 0;
-  cursor: pointer;
 }
 .category-card-title .category-count {
   color: var(--muted);
@@ -1439,11 +1538,16 @@ img {
 }
 .category-rail {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 2px;
+  padding-bottom: 4px;
+  padding-right: 16px;
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+.category-rail .rail-card {
+  scroll-snap-align: start;
 }
 .category-rail::-webkit-scrollbar {
   display: none;
