@@ -1165,6 +1165,10 @@ img {
   overflow: hidden;
   border-radius: var(--radius);
   background: var(--paper);
+  /* Shrink-wrap the preview so crop % match bitmap (no object-fit letterbox) */
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
 }
 
 .image-editor-stage.cropping {
@@ -1174,8 +1178,9 @@ img {
 .image-editor-stage .image-preview {
   margin-bottom: 0;
   pointer-events: none;
-  width: 100%;
+  width: auto;
   height: auto;
+  max-width: 100%;
   max-height: 360px;
   aspect-ratio: auto;
   object-fit: contain;
